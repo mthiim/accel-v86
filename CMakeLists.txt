@@ -21,7 +21,7 @@ set_property(GLOBAL PROPERTY OS_FOLDERS ON)
 #
 
 # Specify the CEF distribution version.
-set(CEF_VERSION "3.3538.1852.gcb937fc")
+set(CEF_VERSION "73.1.12+gee4b49f+chromium-73.0.3683.75")
 
 # Determine the platform.
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
@@ -117,23 +117,14 @@ endif()
 add_subdirectory(${CEF_LIBCEF_DLL_WRAPPER_PATH} libcef_dll_wrapper)
 
 # Include CEF's test application targets (executes <target>/CMakeLists.txt).
-add_subdirectory(${CEF_ROOT}/tests/cefclient)
-add_subdirectory(${CEF_ROOT}/tests/cefsimple)
-add_subdirectory(${CEF_ROOT}/tests/gtest)
-add_subdirectory(${CEF_ROOT}/tests/ceftests)
+
+
 
 # Allow includes relative to the current source directory.
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
-# Configure building of the examples.
-option(WITH_EXAMPLES "Enable or disable building of examples." ON)
-if(WITH_EXAMPLES)
-  # Include example application targets.
-  add_subdirectory(examples)
-endif()
 
-# TODO: Include other application targets here.
-
+add_subdirectory(virtual)
 
 # Display configuration settings.
 PRINT_CEF_CONFIG()
