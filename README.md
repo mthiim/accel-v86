@@ -36,13 +36,15 @@ which will launch an HTTP server on port 8000.
  
 # How to compile the C++ side
 
-You need to have CMake, Python (2.x) and Visual Studio installed. Both must be on the system path. Check out the project. Then create a subfolder "build" and go to it. From there, execute:
+You need to have CMake, Python (2.x). Both must be on the system path. Additionally you must have Visual Studio (either 2017 or 2019) installed. Check out the project. Then create a subfolder "build" and go to it. 
+
+From a Visual Studio command line, execute:
 
 ```
 cmake -G "Visual Studio 16 2019" ..
 ```
 
-(VS 2017 should also work).
+(VS 2017 should also work - use "Visual Studio 15 2017").
 
 This will result in a Visual Studio project being generated - the file is called: cef.sln. Open it in Visual Studio and compile. This will result in a "Virtual.exe" file being created in the "Virtual\Debug" subdirectory
 underneath "build". For better performance, compile the project in release mode.
