@@ -1,105 +1,52 @@
-The [Chromium Embedded Framework](https://bitbucket.org/chromiumembedded/cef/) (CEF) is a simple framework for embedding Chromium-based browsers in other applications. This repository hosts a sample project called "cef-project" that can be used as the starting point for third-party applications built using CEF.
+This is an experimental project for adding Hyper-V acceleration support to [v86](https://github.com/copy/v86) which is a JavaScript-based x86 emulator. I wrote this over a few days, mainly to experiment with the
+[Windows Hypervisor Platform API](https://docs.microsoft.com/en-us/virtualization/api/hypervisor-platform/hypervisor-platform). It was quite easy 
+to get started with the API but I quickly needed implementation of common PC hardware to see anything interesting running. Then I thought of "melting together"
+the C cside of my Hyper-V project with the excellent v86 JavaScript emulator I had recently encountered. It has the benefit the code base is very accessible so it was quite easy for me to see
+how I could hook into it. I decided to publish my result in case others would find it interesting.
 
-# Quick Links
+At least Linux 2.6 boots and runs. The CPU is of course orders of magnitude faster than when running in "native JavaScript" but the I/O is slower due to the callback to the JavaScript
+side that are triggered by I/O port instructions and MMIO. I am sure many optimizations are possible.
 
-* Project Page - https://bitbucket.org/chromiumembedded/cef-project
-* Tutorial - https://bitbucket.org/chromiumembedded/cef/wiki/Tutorial
-* Support Forum - http://www.magpcss.org/ceforum/
+It could be useful for debugging v86 - if a bug disappears by switching to this implementation, it suggests an error in the virtual CPU implementation and not in the virtual hardware implementation.
 
-# Setup
+** Note! You need to enable "Windows Hypervisor Platform" in the "Turn Windows features on/off" dialogue. It is not inside the "Hyper-V" option tree but further down in the dialogue.**   
 
-First install some necessary tools and download the cef-project source code.
+# How it works
 
-1\. Install [CMake](https://cmake.org/), a cross-platform open-source build system. Version 2.8.12.1 or newer is required.
+The project is a Chrome Embedded project. As such it is a web-browser, based on Chrome. However, the browser exposes special JavaScript objects and functions to JS code for providing
+Hyper-V acceleration. I have then modified ``cpu.js`` file to look for this object. If it exists, it will then cooperate with it so that the C++ side handles the CPU virtualization (via Hyper-V) whereas all other hardware
+emulation happens in the v86 JavaScript code. My code bridges the two worlds - memory-mapped and port I/O are moved to the JavaScript side whereas interrupts are injected into the C++ side etc.
+Memory is implemented as follows: The machine memory gets allocated as a big array in the C++ side and forms the memory provided to Hyper-V. But it is also used as a backing store for a JavaScript ArrayBuffer I then return to the JavaScript-side store as your CPU's "memory". Through a callback I unmap from Hyper-V any memory regions (so that they will cause exits) that are mapped via v86's mmap_register() function to allow MMIO to devices to function correctly. Likewise, I handle memory-related exits in Hyper-V by handling those to v86and same for I/O. 
 
-2\. Install [Python](https://www.python.org/downloads/). Version 2.x is required. If Python is not installed to the default location you can set the `PYTHON_EXECUTABLE` environment variable before running CMake (watch for errors during the CMake generation step below).
 
-3\. Install platform-specific build tools.
+# How to compile the JavaScript side
+Head over to my fork of v86: https://github.com/mthiim/v86. Check out the ``HyperVAccel`` branch from that repo.
 
-* Linux: Currently supported distributions include Debian Wheezy, Ubuntu Precise, and related. Ubuntu 14.04 64-bit is recommended. Newer versions will likely also work but may not have been tested. Required packages include: build-essential, libgtk2.0-dev, libgtkglext1-dev.
-* macOS: Xcode 6 or newer building on macOS 10.9 (Mavericks) or newer is required. Xcode 8.3 and macOS 10.12 (Sierra) are recommended. The Xcode command-line tools must also be installed. Only 64-bit builds are supported on macOS.
-* Windows: Visual Studio 2013 or newer building on Windows 7 or newer is required. Visual Studio 2017 and Windows 10 64-bit are recommended.
+The debug version doesn't require compilation, but the release version offers better performance (also in the integrated mode).
+You can compile the release version either from Linux or from a Windows Subsystem for Linux shell (you need to have Python and unzip installed) using "make" as per the usual instructions from the v86 project. Of course you can also manually
+download and run the Closure compiler - see the Makefile for the command to execute. 
 
-4\. Download the cef-project source code from the [Downloads page](https://bitbucket.org/chromiumembedded/cef-project/downloads) or by using [Git](https://git-scm.com/) command-line tools:
-
-```
-git clone https://bitbucket.org/chromiumembedded/cef-project.git
-```
-
-# Build
-
-Now run CMake which will download the CEF binary distribution from the [Spotify automated builder](http://opensource.spotify.com/cefbuilds/index.html) and generate build files for your platform. Then build using platform build tools. For example, using the most recent tool versions on each platform:
+After compiling, you can launch a web server:
 
 ```
-cd /path/to/cef-project
-
-# Create and enter the build directory.
-mkdir build
-cd build
-
-# To perform a Linux build using a 32-bit CEF binary distribution on a 32-bit
-# Linux platform or a 64-bit CEF binary distribution on a 64-bit Linux platform:
-cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release ..
-make -j4
-
-# To perform a macOS build using a 64-bit CEF binary distribution:
-cmake -G "Xcode" ..
-# Then, open build\cef.xcodeproj in Xcode and select Product > Build.
-
-# To perform a Windows build using a 32-bit CEF binary distribution:
-cmake -G "Visual Studio 15" ..
-# Then, open build\cef.sln in Visual Studio 2017 and select Build > Build Solution.
-
-# To perform a Windows build using a 64-bit CEF binary distribution:
-cmake -G "Visual Studio 15 Win64" ..
-# Then, open build\cef.sln in Visual Studio 2017 and select Build > Build Solution.
+python -m SimpleHTTPServer 8000
 ```
 
-CMake supports different generators on each platform. Run `cmake --help` to list all supported generators. Generators that have been tested with CEF include:
+which will launch an HTTP server on port 8000.
+ 
+# How to compile the C++ side
 
-* Linux: Ninja, Unix Makefiles
-* macOS: Ninja, Xcode 6+
-* Windows: Ninja, Visual Studio 2013+
+You need to have CMake, Python (2.x) and Visual Studio installed. Both must be on the system path. Check out the project. Then create a subfolder "build" and go to it. From there, execute:
 
-Ninja is a cross-platform open-source tool for running fast builds using pre-installed platform toolchains (GNU, clang, Xcode or MSVC). See comments in the "third_party/cef/cef_binary_*/CMakeLists.txt" file for Ninja usage instructions.
+```
+cmake -G "Visual Studio 16 2019" ..
+```
 
-# Examples
+(VS 2017 should also work).
 
-CEF provides a number of examples that you can use as a starting point or reference for your own CEF-based development.
+This will result in a Visual Studio project being generated - the file is called: cef.sln. Open it in Visual Studio and compile. This will result in a "Virtual.exe" file being created in the "Virtual\Debug" subdirectory
+underneath "build". For better performance, compile the project in release mode.
 
-* By default all example targets will be included in the project files generated using CMake.
-* The CEF binary distribution includes cefsimple and cefclient sample applications.
-    * The cefsimple application demonstrates the minimal implementation required for a standalone executable target and is described on the [Tutorial](https://bitbucket.org/chromiumembedded/cef/wiki/Tutorial.md) Wiki page.
-    * The cefclient application demonstrates a wide range of CEF functionality most of which is documented on the [GeneralUsage](https://bitbucket.org/chromiumembedded/cef/wiki/GeneralUsage.md) Wiki page.
-* The [examples directory](examples) contains example targets that demonstrate specific aspects of CEF functionality.
-    * See the [examples README.md file](examples/README.md) for information about the examples targets.
-    * Add `-DWITH_EXAMPLES=Off` to the cmake command-line if you do not wish to build the examples targets.
-
-# Next Steps
-
-Here are some activities you might want to try next to gain a better understanding of CEF:
-
-1\. Update the CEF version used to build your local copy of cef-project:
-
-* Visit the [Spotify automated builder](http://opensource.spotify.com/cefbuilds/index.html) page to see what CEF versions are available.
-* Change the "CEF_VERSION" value near the top of the [top-level CMakeLists.txt file](https://bitbucket.org/chromiumembedded/cef-project/src/master/CMakeLists.txt?fileviewer=file-view-default).
-* Re-run the cmake and build commands. Add `-DWITH_EXAMPLES=Off` to the cmake command-line to disable targets from the [examples directory](examples) because they may not build successfully with the new CEF version.
-
-2\. Add your own project source code:
-
-* Create a new "myproject" directory in the root cef-project directory (e.g. "/path/to/cef-project/myproject").
-* Copy the contents of the "third_party/cef/cef_binary_*/cefsimple" directory to "myproject" as a starting point.
-* Add a new `add_subdirectory(myproject)` command near the end of [top-level CMakeLists.txt file](https://bitbucket.org/chromiumembedded/cef-project/src/master/CMakeLists.txt?fileviewer=file-view-default) after the existing add_subdirectory commands.
-* Change the "CEF_TARGET" and "CEF_HELPER_TARGET" values in "myproject/CMakeLists.txt" from "cefsimple" to "myproject".
-* (Windows only) Rename the "cefclient.exe.manifest" file to "myproject.exe.manifest" in both "myproject/CMakeLists.txt" and the "myproject" directory.
-* Re-run the cmake and build commands.
-
-3\. Gain a better understanding of the cefsimple application by reading the [Tutorial](https://bitbucket.org/chromiumembedded/cef/wiki/Tutorial.md) Wiki page.
-
-4\. Fork the cef-project repository using Bitbucket and Git to store the source code for your own CEF-based project. See the [ContributingWithGit](https://bitbucket.org/chromiumembedded/cef/wiki/ContributingWithGit.md) Wiki page for details (replace all instances of "cef" with "cef-project" in those instructions).
-
-5\. Review the [GeneralUsage](https://bitbucket.org/chromiumembedded/cef/wiki/GeneralUsage.md) Wiki page for additional details on CEF implementation and usage.
-
-# Support and Contributions
-
-If you have any questions about CEF or cef-project please ask on the [CEF Forum](http://www.magpcss.org/ceforum/). If you would like to make contributions please see the "Helping Out" section of the [CEF Main Page](https://bitbucket.org/chromiumembedded/cef/).
+You run the program by simply starting virtual.exe. This will open a "browser window" that automatically heads to 127.0.0.1:8000 where the pages from above are hosted. You can run
+your virtual machines from there (you may need to copy in image files to the "image" directory as usual with the v86 project). Go to the "release" page for much improved performance.
+  
