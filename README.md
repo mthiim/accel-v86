@@ -35,8 +35,8 @@ partition is created and a "machine" JavaScript object (implemented in the C++ s
 
 This object has the following fields and methods:
 
-| Key        | Type           | Description  |
-| ------------- |:-------------:| -----:|
+| Key        | Type         | Description  |
+|------------|--------------|--------------|
 | memory      | ArrayBuffer | Array buffer containing the memory of the machine |
 | parambuf      | ArrayBuffer     |   Small array buffer used for passing parameters back and forth between the C++ and JavaScript side (improves performance compared to transferring as JavaScript args) |
 | run | function      | Runs the virtual machine. Takes no argument. The machine is run for a few time ticks or until it halts. The function returns the current value of RFLAGS augmented with a "HLT flag" (so the JS side can see the whether interrupts can be injected or if machine is HLT'ed, etc.). Note that callbacks to the JS side may occur in response to calling run(). |
